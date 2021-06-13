@@ -11,6 +11,7 @@ class Account(models.Model):
 	access_token = models.CharField(default = None, max_length = 500,
 	null = True, blank = True)
 	created_time = models.IntegerField()
+	last_used = models.IntegerField(default = 0)
 	is_active = models.BooleanField(default = False)
 	is_in_use = models.BooleanField(default = False)
 	like_count = models.IntegerField()
