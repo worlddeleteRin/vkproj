@@ -1,0 +1,84 @@
+from django.db import models
+import time
+from datetime import datetime
+from accounts.models import * 
+from vk_core.vk_core import * 
+
+# Create your models here.
+
+class Task(models.Model):
+	task_types = [
+		('like_group_last_n_posts', 'like_group_last_n_posts'),
+		('like_group_posts_list', 'like_group_posts_list'),
+		('repost', 'repost'),
+	]
+	t_type = models.CharField(default = None,
+	max_length = 300,
+	choices = task_types)
+	is_active = models.BooleanField(default =  True)
+	is_infinite = models.BooleanField(default = True)
+	frequency = models.IntegerField(default = 0)
+	last_action_time = models.DateTimeField(default = None)
+	admin_access_token = models.CharField(default = None,
+		max_length = 300,
+		blank = True, null = True)
+	bots_use_count = models.IntegerField(default = 1)
+	last_posts_to_like = models.IntegerField(default = 0)
+	group_id = models.IntegerField(default = None,
+	blank = True, null = True)
+
+	def time_to_make(self):
+		if not self.last_action_time:
+			return True
+		now = int(time.time())
+		time_past = now - self.last_action_time.timestamp().__int__()
+		if time_past > self.frequency:
+			return True
+		return False
+	def set_last_action_time_now(self):
+		now = int(time.time())
+		self.last_action_time = datetime.fromtimestamp(now)
+
+
+def has_tasks():
+	t = Task.objects.all().filter(is_active = True).__len__()
+	if t > 0:
+		return True
+	return False
+def active_tasks():
+	active_tasks = Task.objects.all().filter(is_active = True)
+	return active_tasks
+
+def make_tasks():
+	print('start to make tasks')
+	for task in active_tasks():
+		if task.t_type == 'like_group_last_n_posts':
+			like_group_last_n_posts(task)
+		time.sleep(10)
+
+def like_group_last_n_posts(task):
+	print('*'*20)
+	print('Start like last n posts task')
+	print('*'*20)
+	time.sleep(1)
+	if task.time_to_make():
+		# task need to be make
+		bots_to_use = get_bots_to_use()
+		bots_to_use = bots_to_use[:task.bots_use_count]
+		for bot in bots_to_use:
+			print('user id is', bot.vk_id)
+			client = VkClient()
+			client.configure(bot.access_token)
+			wall = VkWall(client, task.group_id, task.group_id)
+			posts = wall.get_posts(task.last_posts_to_like)
+			if not posts:
+				return None
+			for post in posts:
+				post.like()
+				time.sleep(3)
+			bot.set_used_time()
+		# set task new last action time 
+		task.set_last_action_time_now()
+		task.save()
+	else:
+		print('time to make task not come')
